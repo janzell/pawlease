@@ -1,12 +1,22 @@
 import express from "express";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { openDb } from "./db.ts";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { createClient } from "@libsql/client";
+import { createDb } from "./db.ts";
 import { createApp } from "./app.ts";
 
+// Local/self-hosted entry point. Uses Turso when TURSO_DATABASE_URL is set,
+// otherwise a local SQLite file.
 const prod = process.env.NODE_ENV === "production";
 const port = Number(process.env.PORT ?? 3001);
-const db = openDb(process.env.DATABASE_PATH ?? resolve("data/pawlease.db"));
+
+let url = process.env.TURSO_DATABASE_URL;
+if (!url) {
+  const file = resolve(process.env.DATABASE_PATH ?? "data/pawlease.db");
+  mkdirSync(dirname(file), { recursive: true });
+  url = `file:${file}`;
+}
+const db = createDb(createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN }));
 const app = createApp(db, { secureCookies: prod && process.env.INSECURE_COOKIES !== "1" });
 
 // In production the API also serves the built SPA.
@@ -16,4 +26,4 @@ if (prod && existsSync(dist)) {
   app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(resolve(dist, "index.html")));
 }
 
-app.listen(port, () => console.log(`Pawlease API listening on http://localhost:${port}`));
+app.listen(port, () => console.log(`Pawlease listening on http://localhost:${port}`));

@@ -1,14 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { openDb } from "./db.ts";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createClient } from "@libsql/client";
+import { createDb } from "./db.ts";
 import { advanceDate, createApp } from "./app.ts";
 
 let server: Server;
 let base: string;
 
 beforeEach(async () => {
-  const app = createApp(openDb(":memory:"));
+  // A real file rather than :memory:, since libSQL transactions open a new
+  // connection and would otherwise see an empty in-memory database.
+  const file = join(mkdtempSync(join(tmpdir(), "pawlease-")), "test.db");
+  const app = createApp(createDb(createClient({ url: `file:${file}` })));
   server = await new Promise<Server>((r) => {
     const s = app.listen(0, () => r(s));
   });
@@ -173,6 +180,23 @@ describe("resources", () => {
     const data = (await c("GET", "/api/data")).body;
     expect(data.pets[0].weight_kg).toBe(12.5);
     expect(data.activities[0].kind).toBe("weight");
+  });
+
+  it("cleans up references when a pet or professional is deleted", async () => {
+    const { c } = await signup("Alex");
+    const pet = (await c("POST", "/api/pets", { name: "Biscuit" })).body;
+    const pro = (await c("POST", "/api/professionals", { name: "Dr A" })).body;
+    await c("POST", "/api/activities", { kind: "walk", pet_id: pet.id });
+    const task = (await c("POST", "/api/tasks", { title: "Walk", pet_id: pet.id })).body;
+    const booking = (await c("POST", "/api/bookings", { title: "Vet", starts_at: "2026-11-01T10:00", pet_id: pet.id, professional_id: pro.id })).body;
+
+    await c("DELETE", `/api/pets/${pet.id}`);
+    await c("DELETE", `/api/professionals/${pro.id}`);
+    const data = (await c("GET", "/api/data")).body;
+    expect(data.activities).toEqual([]);
+    expect(data.tasks.find((t: any) => t.id === task.id).pet_id).toBeNull();
+    const b = data.bookings.find((x: any) => x.id === booking.id);
+    expect([b.pet_id, b.professional_id]).toEqual([null, null]);
   });
 
   it("bumps updated_at on note edits and deletes", async () => {

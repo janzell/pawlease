@@ -8,13 +8,15 @@
     "build": "tsc && vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "test": "vitest run",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "build:vercel": "npm run build && node scripts/build-vercel.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "lucide-react": "^1.51.0",
@@ -30,11 +32,15 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  }
 }

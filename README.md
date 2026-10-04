@@ -12,7 +12,7 @@ A mobile-first web app (installable PWA) for looking after your dogs, shared wit
 
 ## Stack
 
-React + TypeScript + Vite frontend; Express API with SQLite (Node's built-in `node:sqlite`, requires Node ≥ 22.13); cookie sessions with scrypt password hashing.
+React + TypeScript + Vite frontend; Express API on libSQL/SQLite (`@libsql/client`): a local file in development, [Turso](https://turso.tech) in production. Cookie sessions with scrypt password hashing.
 
 ## Run
 
@@ -23,4 +23,19 @@ npm test             # API tests
 npm run build && npm start   # production: one server on :3001 serving API + SPA
 ```
 
-Environment: `PORT`, `DATABASE_PATH` (default `data/pawlease.db`), `INSECURE_COOKIES=1` to allow production mode over plain HTTP (local testing only).
+Environment: `PORT`, `DATABASE_PATH` (default `data/pawlease.db`), `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` (use Turso instead of the local file), `INSECURE_COOKIES=1` to allow production mode over plain HTTP (local testing only).
+
+## Deploy to Vercel
+
+Serverless functions have no persistent disk, so production data lives in Turso.
+
+1. **Create a Turso database** (free tier is fine) at [app.turso.tech](https://app.turso.tech) or with the CLI:
+   ```bash
+   turso db create pawlease
+   turso db show pawlease --url        # -> TURSO_DATABASE_URL (libsql://…)
+   turso db tokens create pawlease     # -> TURSO_AUTH_TOKEN
+   ```
+2. **Import the GitHub repo** in Vercel (Add New → Project). Leave the framework as *Other*; `vercel.json` sets the build command.
+3. **Add environment variables** `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` (Production and Preview), then deploy.
+
+Tables are created automatically on the first request. `npm run build:vercel` produces the [Build Output API](https://vercel.com/docs/build-output-api/v3) bundle in `.vercel/output`: the SPA as static files and the API as one bundled Node function at `/api/*`.

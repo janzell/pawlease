@@ -129,19 +129,19 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
-export type RefChecker = (kind: "pets" | "professionals" | "member", id: number) => boolean;
+export type RefChecker = (kind: "pets" | "professionals" | "member", id: number) => Promise<boolean>;
 
 /**
  * Validates a request body against a spec. With `partial`, only provided keys
  * are checked (PATCH); otherwise required fields must be present (POST).
  * Unknown keys are dropped so callers can't write household_id etc.
  */
-export function validate(
+export async function validate(
   spec: ResourceSpec,
   body: unknown,
   partial: boolean,
   refExists: RefChecker,
-): Record<string, string | number | null> {
+): Promise<Record<string, string | number | null>> {
   if (!body || typeof body !== "object") throw new HttpError(400, "Expected a JSON body");
   const input = body as Record<string, unknown>;
   const out: Record<string, string | number | null> = {};
@@ -198,7 +198,7 @@ export function validate(
         }
         const id = Number(v);
         const kind = f.type === "member" ? "member" : f.table;
-        if (!Number.isInteger(id) || !refExists(kind, id)) throw new HttpError(400, `${key} not found`);
+        if (!Number.isInteger(id) || !(await refExists(kind, id))) throw new HttpError(400, `${key} not found`);
         out[key] = id;
         break;
       }
